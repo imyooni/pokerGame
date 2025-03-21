@@ -6,7 +6,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-let rooms = {}; // Store active rooms
+let rooms = {}; // Store active lobbies
 
 io.on("connection", (socket) => {
     console.log(`Player connected: ${socket.id}`);
