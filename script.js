@@ -1,5 +1,6 @@
 const socket = io("wss://https://puzzlebattleserver.onrender.com"); // Replace with your Render backend URL
 
+
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 canvas.width = 500;
