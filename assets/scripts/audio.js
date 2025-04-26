@@ -6,11 +6,13 @@ export function load_audio(scene) {
 
     // SFX
     scene.load.audio('chipFlip', 'assets/audio/SFX/chipFlip.ogg');
+    scene.load.audio('leverPull', 'assets/audio/SFX/leverPull.ogg');
 }
 
 
 const sfxVolumes = {
     chipFlip: 0.5,
+    leverPull: 0.5,
 };
 
 

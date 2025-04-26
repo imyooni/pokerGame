@@ -1,8 +1,6 @@
 import * as sprites from './assets/scripts/sprites.js';
 import * as audio from './assets/scripts/audio.js';
 
-
-
 document.fonts.load('16px DefaultFont').then(() => {
   const config = {
     type: Phaser.AUTO,
@@ -25,37 +23,49 @@ document.fonts.load('16px DefaultFont').then(() => {
   const game = new Phaser.Game(config);
 });
 
-
-
-
-
-function update() {
-}
-
+function update() {}
 
 function preload() {
   sprites.load_sprites(this);
   audio.load_audio(this)
 }
 
-
-
 function create() {
   let roomBack = this.add.sprite(this.cameras.main.centerX,this.cameras.main.centerY,'room_background');
   roomBack.setDepth(-1);
-  let tableCenter = this.add.sprite(this.cameras.main.centerX,this.cameras.main.centerY,'tableCenter');
-  let tablePlayer = this.add.sprite(this.cameras.main.centerX,0,'tablePlayer');
-  tablePlayer.y = tableCenter.y+tableCenter.height-tablePlayer.height
+
+  this.tableEnabled = false
+  this.lever = this.add.sprite(0,0,'switch')
+  this.lever.setInteractive()
+  this.lever.mode = null
+  this.lever.active = true
+  this.lever.setPosition(this.scale.width-(this.lever.width-15),this.scale.height-(this.lever.height-60))
+  this.lever.on('pointerdown', () => {
+    if (this.lever.active) return
+    const indices = [0, 5, 2];
+    chips.forEach(c => {
+      flipChip(this, c, true, true);
+    });
+    this.lever.active = true
+    this.lever.setFrame(1)
+    audio.playSound('leverPull',this)
+    this.time.delayedCall(500, () => {
+      this.lever.setFrame(0)
+      this.time.delayedCall(100, () => {
+        this.lever.active = false
+      });
+    });
+  })
 
 
   this.input.keyboard.on('keydown-Q', () => {
     const indices = [0, 5, 2];
     indices.forEach(index => {
-      //chips[index] = generateChipSprite(this, index);
       flipChip(this, chips[index], true, true);
     });
   });
 
+  this.chipsWait = 0
   const chipWidth = 62;
   const chipHeight = 70;
   const cols = 5;
@@ -71,6 +81,7 @@ function create() {
   
 
   function generateChipSprite(scene, index) {
+    
     const row = Math.floor(index / cols);
     const col = index % cols;
   
@@ -108,15 +119,18 @@ function create() {
   
     chipContainer.chipSprite = chipSprite;
     chipContainer.chipText = chipText;
-  
+
     chipContainer.on('pointerdown', () => {
-      if (chipContainer.notSet) {
-        audio.playSound('chipFlip', scene)
-      } 
-      
-      flipChip(scene, chipContainer)
-    }
-  );
+      if (!scene.tableEnabled) return
+      if (chipContainer.notSet && !chipContainer.isFlipping) {
+        scene.chipsWait -= 1;  // Decrement immediately
+        audio.playSound('chipFlip', scene);
+      }
+      scene.lever.mode = 'single'
+      scene.lever.active = true;
+      flipChip(scene, chipContainer);  // Flip the chip without waiting for the animation
+    });
+    
     chipContainer.on('pointerover', () => {
       if (!chipContainer.isFlipping) {
         chipContainer.hover = true;
@@ -132,81 +146,22 @@ function create() {
     const delay = index * 50;
     scene.time.delayedCall(delay, () => {
       chipContainer.enabled = true;
-      flipChip(scene, chipContainer, true);
-    });
-  
-    return chipContainer;
-  }
-  
-  
-
-  /*
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const chipSprite = this.add.sprite(0, 0, 'chips', 9);
-      const chipText = this.add.text(0, 0, '?', {
-        fontSize: '20px',
-        fontFamily: 'DefaultFont',
-        color: '#FFFFFF',
-        stroke: '#000000',
-        strokeThickness: 2,
-      }).setOrigin(0.5, 0.8).setDepth(10);
-
-      const chipContainer = this.add.container(
-        startX + col * chipWidth,
-        startY + row * chipHeight,
-        [chipSprite, chipText]
-      );
-
-      chipContainer.setSize(chipWidth, chipHeight);
-      chipContainer.setInteractive();
-      chipContainer.enabled = false;
-      chipContainer.isFlipping = false;
-      chipContainer.notSet = true;
-
-      const chipData = generateChip();
-      chipContainer.type = chipData.type;
-      chipContainer.value = chipData.baseValue;
-      chipContainer.basePosition = [chipContainer.x, chipContainer.y];
-      chipContainer.alpha = 0;
-
-      if (col === 0 && row === 0) {
-        chipContainer.type = 8;
-        chipContainer.value = 5000;
-      }
-
-      chipContainer.chipSprite = chipSprite;
-      chipContainer.chipText = chipText;
-
-      chipContainer.on('pointerdown', () => flipChip(this, chipContainer));
-      chipContainer.on('pointerover', () => {
-        if (!chipContainer.isFlipping) {
-          chipContainer.hover = true;
-          chipContainer.y -= 5;
+      flipChip(scene, chipContainer, true, false, () => {
+        scene.chipsWait += 1;  // Increment when flip completes
+        if (scene.chipsWait === chips.length) {
+          scene.tableEnabled = true
+          scene.lever.active = false;  // Deactivate lever after all chips are flipped
         }
       });
-
-      chipContainer.on('pointerout', () => {
-        chipContainer.hover = false;
-        chipContainer.y = chipContainer.basePosition[1];
-      });
-
-      chips.push(chipContainer);
-     
-
-      const delay = (row * cols + col) * 50;
-      this.time.delayedCall(delay, () => {
-        chipContainer.enabled = true;
-        flipChip(this, chipContainer, true);
-      });
-    }
+    });
+       
+    return chipContainer;
   }
-*/
 
-  function flipChip(scene, chipContainer, start = false, force = false) {
-    if (chipContainer.isFlipping || (!chipContainer.enabled && !force)) return;
-    if (!start && !force && !chipContainer.notSet) return;
 
+  function flipChip(scene, chipContainer, start = false, newChip = false, onComplete = null) {
+    if (chipContainer.isFlipping || (!chipContainer.enabled)) return;
+    if (!start && !chipContainer.notSet) return;
     chipContainer.isFlipping = true;
     scene.tweens.add({
       targets: chipContainer,
@@ -216,6 +171,11 @@ function create() {
       duration: 200,
       ease: 'Cubic.easeOut',
       onComplete: () => {
+        if (newChip) {
+          chipContainer.chipData = generateChip();
+          chipContainer.type = chipContainer.chipData.type;
+          chipContainer.value = chipContainer.chipData.baseValue;
+        }
         if (start) {
           chipContainer.chipSprite.setFrame(9);
           chipContainer.chipText.setText("?");
@@ -246,6 +206,16 @@ function create() {
 
             chipContainer.angle = 0;
             chipContainer.isFlipping = false;
+            if (scene.lever.mode === 'single') {
+              scene.chipsWait += 1
+              if (scene.chipsWait === chips.length) {
+              scene.lever.active = false
+              scene.lever.mode = null
+              }
+            }
+            if (typeof onComplete === 'function') {
+              onComplete();
+            }
           }
         });
       }
